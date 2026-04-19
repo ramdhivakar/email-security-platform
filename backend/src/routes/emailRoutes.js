@@ -6,7 +6,11 @@ const authMiddleware = require("../middleware/authMiddleware");
 
 const emailController = require("../controllers/emailController");
 
-// email ingestion endpoint
+
+/*
+EMAIL INGESTION
+*/
+
 router.post(
 
  "/email/ingest",
@@ -16,5 +20,21 @@ router.post(
  emailController.ingestEmail
 
 );
+
+
+/*
+EMAIL LIST
+*/
+
+router.get(
+
+ "/email/list",
+
+ authMiddleware,
+
+ emailController.getEmails
+
+);
+
 
 module.exports = router;
