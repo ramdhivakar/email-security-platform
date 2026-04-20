@@ -2,16 +2,40 @@ const Email = require("../models/Email");
 
 const analyzeEmail = require("../services/emailAnalysisService");
 
+const createLog = require("../services/logService");
+
+
+/*
+================================================
+
+EMAIL INGESTION CONTROLLER
+
+Simulates incoming email into cloud email security system
+
+Flow:
+1. Receive email data
+2. Identify tenant from JWT
+3. Analyze email content + policy rules
+4. Apply quarantine logic
+5. Store result in DB
+6. Write log
+7. Return response
+
+================================================
+*/
+
 exports.ingestEmail = async (req, res) => {
 
  try {
 
   const {
+
    from,
    to,
    subject,
    content,
    attachments
+
   } = req.body;
 
 
@@ -19,17 +43,23 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  run analysis with policy rules
+  run detection engine
   */
 
-  const verdict = await analyzeEmail({
+  const verdict = await analyzeEmail(
 
-   from,
-   subject,
-   content,
-   attachments
+   {
 
-  }, tenantId);
+    from,
+    subject,
+    content,
+    attachments
+
+   },
+
+   tenantId
+
+  );
 
 
   /*
@@ -44,6 +74,10 @@ exports.ingestEmail = async (req, res) => {
 
   }
 
+
+  /*
+  store email
+  */
 
   const email = await Email.create({
 
@@ -64,6 +98,35 @@ exports.ingestEmail = async (req, res) => {
   });
 
 
+  /*
+  create log entry
+  */
+
+  await createLog(
+
+   tenantId,
+
+   "email_scan",
+
+   `Email analyzed with verdict ${verdict}`,
+
+   verdict === "malicious" ? "critical" : "info",
+
+   {
+
+    emailId: email._id,
+
+    from,
+
+    subject,
+
+    status
+
+   }
+
+  );
+
+
   res.json({
 
    message: "Email received and analyzed",
@@ -79,6 +142,9 @@ exports.ingestEmail = async (req, res) => {
 
  } catch (error) {
 
+  console.error(error);
+
+
   res.status(500).json({
 
    error: error.message
@@ -89,15 +155,27 @@ exports.ingestEmail = async (req, res) => {
 
 };
 
+
+
+/*
+================================================
+
+GET EMAIL LIST
+
+Used for dashboard list view
+
+Tenant isolation applied
+
+================================================
+*/
+
 exports.getEmails = async (req, res) => {
 
  try {
 
-  // tenantId extracted from JWT
   const tenantId = req.user.tenantId;
 
 
-  // fetch emails belonging to tenant
   const emails = await Email.find({
 
    tenantId
@@ -139,7 +217,7 @@ exports.getEmails = async (req, res) => {
 
 GET SINGLE EMAIL DETAILS
 
-Used for investigation view
+Used for investigation screen
 
 Ensures tenant isolation
 
@@ -190,12 +268,16 @@ exports.getEmailById = async (req, res) => {
 
 };
 
+
+
 /*
 ================================================
 
 DELETE EMAIL
 
-Used for compliance, cleanup or admin removal
+Used for admin cleanup or compliance
+
+Logs deletion activity
 
 ================================================
 */
@@ -209,13 +291,10 @@ exports.deleteEmail = async (req, res) => {
   const emailId = req.params.id;
 
 
-  /*
-  ensure tenant owns this email
-  */
-
   const email = await Email.findOneAndDelete({
 
    _id: emailId,
+
    tenantId
 
   });
@@ -232,9 +311,37 @@ exports.deleteEmail = async (req, res) => {
   }
 
 
+  /*
+  log deletion event
+  */
+
+  await createLog(
+
+   tenantId,
+
+   "system",
+
+   "Email deleted by admin",
+
+   "warning",
+
+   {
+
+    emailId,
+
+    subject: email.subject,
+
+    from: email.from
+
+   }
+
+  );
+
+
   res.json({
 
    message: "Email deleted successfully",
+
    emailId
 
   });
