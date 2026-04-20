@@ -232,3 +232,65 @@ exports.getEmailById = async (req, res) => {
  }
 
 };
+
+/*
+================================================
+
+DELETE EMAIL
+
+Used for compliance, cleanup or admin removal
+
+================================================
+*/
+
+exports.deleteEmail = async (req, res) => {
+
+ try {
+
+  const tenantId = req.user.tenantId;
+
+  const emailId = req.params.id;
+
+
+  /*
+  ensure tenant owns this email
+  */
+
+  const email = await Email.findOneAndDelete({
+
+   _id: emailId,
+   tenantId
+
+  });
+
+
+  if (!email) {
+
+   return res.status(404).json({
+
+    error: "Email not found or not authorized"
+
+   });
+
+  }
+
+
+  res.json({
+
+   message: "Email deleted successfully",
+   emailId
+
+  });
+
+
+ } catch (error) {
+
+  res.status(500).json({
+
+   error: error.message
+
+  });
+
+ }
+
+};

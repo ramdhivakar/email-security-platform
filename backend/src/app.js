@@ -43,7 +43,6 @@ app.use("/api/dashboard", dashboardRoutes);
 
 app.use("/api/quarantine", quarantineRoutes);
 
-
 /*
 =====================================
 

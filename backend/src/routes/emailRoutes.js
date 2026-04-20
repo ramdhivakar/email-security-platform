@@ -7,39 +7,31 @@ const authMiddleware = require("../middleware/authMiddleware");
 const emailController = require("../controllers/emailController");
 
 
-/*
-EMAIL INGESTION
-*/
-
 router.post(
-
- "/email/ingest",
-
+ "/ingest",
  authMiddleware,
-
  emailController.ingestEmail
-
 );
 
 
-/*
-EMAIL LIST
-*/
-
 router.get(
-
- "/email/list",
-
+ "/",
  authMiddleware,
-
  emailController.getEmails
-
 );
 
+
 router.get(
- "/email/:id",
+ "/:id",
  authMiddleware,
  emailController.getEmailById
+);
+
+
+router.delete(
+ "/:id",
+ authMiddleware,
+ emailController.deleteEmail
 );
 
 
