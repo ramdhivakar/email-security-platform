@@ -2,7 +2,6 @@ const express = require("express");
 
 const cors = require("cors");
 
-
 const authRoutes = require("./routes/authRoutes");
 
 const emailRoutes = require("./routes/emailRoutes");
@@ -10,6 +9,9 @@ const emailRoutes = require("./routes/emailRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
 const quarantineRoutes = require("./routes/quarantineRoutes");
+
+const policyRoutes = require("./routes/policyRoutes");
+
 
 const app = express();
 
@@ -42,6 +44,9 @@ app.use("/api/email", emailRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
 app.use("/api/quarantine", quarantineRoutes);
+
+app.use("/api/policy", policyRoutes);
+
 
 /*
 =====================================
