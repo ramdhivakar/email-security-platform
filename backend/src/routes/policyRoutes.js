@@ -12,8 +12,6 @@ const policyController = require("../controllers/policyController");
 
 CREATE OR UPDATE POLICY
 
-POST /api/policy
-
 ================================================
 */
 
@@ -23,7 +21,7 @@ router.post(
 
  authMiddleware,
 
- policyController.savePolicy
+ policyController.upsertPolicy
 
 );
 
@@ -32,8 +30,6 @@ router.post(
 ================================================
 
 GET POLICY
-
-GET /api/policy
 
 ================================================
 */

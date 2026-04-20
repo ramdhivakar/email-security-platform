@@ -1,27 +1,32 @@
 const Policy = require("../models/Policy");
 
+const createLog = require("../services/logService");
+
+
 /*
 ================================================
 
 CREATE OR UPDATE POLICY
 
-Each tenant has only one policy
-
 ================================================
 */
 
-exports.savePolicy = async (req, res) => {
+exports.upsertPolicy = async (req, res) => {
 
  try {
 
   const tenantId = req.user.tenantId;
 
+
   const {
 
-   blockExecutable,
-   maxAttachmentSize,
    blockedDomains,
-   allowedFileTypes
+
+   allowedFileTypes,
+
+   maxAttachmentSize,
+
+   blockExecutable
 
   } = req.body;
 
@@ -34,57 +39,89 @@ exports.savePolicy = async (req, res) => {
 
 
   /*
-  update existing policy
+  create policy if not exists
   */
 
-  if (policy) {
+  if (!policy) {
 
-   policy.blockExecutable = blockExecutable ?? policy.blockExecutable;
+   policy = await Policy.create({
 
-   policy.maxAttachmentSize = maxAttachmentSize ?? policy.maxAttachmentSize;
+    tenantId,
 
-   policy.blockedDomains = blockedDomains ?? policy.blockedDomains;
+    blockedDomains,
 
-   policy.allowedFileTypes = allowedFileTypes ?? policy.allowedFileTypes;
+    allowedFileTypes,
+
+    maxAttachmentSize,
+
+    blockExecutable
+
+   });
+
+
+   await createLog({
+
+    tenantId,
+
+    type: "policy_update",
+
+    severity: "info",
+
+    message: "Policy created",
+
+    metadata: {
+
+     blockedDomains,
+
+     allowedFileTypes
+
+    }
+
+   });
+
+
+  } else {
+
+   /*
+   update policy
+   */
+
+   policy.blockedDomains = blockedDomains;
+
+   policy.allowedFileTypes = allowedFileTypes;
+
+   policy.maxAttachmentSize = maxAttachmentSize;
+
+   policy.blockExecutable = blockExecutable;
 
 
    await policy.save();
 
 
-   return res.json({
+   await createLog({
+
+    tenantId,
+
+    type: "policy_update",
+
+    severity: "warning",
 
     message: "Policy updated",
 
-    policy
+    metadata: {
+
+     blockedDomains,
+
+     allowedFileTypes
+
+    }
 
    });
 
   }
 
 
-  /*
-  create new policy
-  */
-
-  policy = await Policy.create({
-
-   tenantId,
-
-   blockExecutable,
-   maxAttachmentSize,
-   blockedDomains,
-   allowedFileTypes
-
-  });
-
-
-  res.json({
-
-   message: "Policy created",
-
-   policy
-
-  });
+  res.json(policy);
 
 
  } catch (error) {
@@ -123,11 +160,7 @@ exports.getPolicy = async (req, res) => {
   });
 
 
-  res.json({
-
-   policy
-
-  });
+  res.json(policy);
 
 
  } catch (error) {

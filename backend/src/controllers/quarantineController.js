@@ -1,14 +1,12 @@
 const Email = require("../models/Email");
 
+const createLog = require("../services/logService");
+
 
 /*
 ================================================
 
 GET QUARANTINED EMAILS
-
-Returns only emails that were quarantined
-
-Tenant isolation applied
 
 ================================================
 */
@@ -20,13 +18,10 @@ exports.getQuarantinedEmails = async (req, res) => {
   const tenantId = req.user.tenantId;
 
 
-  /*
-  fetch quarantined emails
-  */
-
   const emails = await Email.find({
 
    tenantId,
+
    status: "quarantined"
 
   })
@@ -41,6 +36,7 @@ exports.getQuarantinedEmails = async (req, res) => {
   res.json({
 
    count: emails.length,
+
    emails
 
   });
@@ -65,8 +61,6 @@ exports.getQuarantinedEmails = async (req, res) => {
 
 RELEASE EMAIL FROM QUARANTINE
 
-Used when admin marks email as safe
-
 ================================================
 */
 
@@ -79,14 +73,12 @@ exports.releaseEmail = async (req, res) => {
   const emailId = req.params.id;
 
 
-  /*
-  find quarantined email
-  */
-
   const email = await Email.findOne({
 
    _id: emailId,
+
    tenantId,
+
    status: "quarantined"
 
   });
@@ -96,16 +88,12 @@ exports.releaseEmail = async (req, res) => {
 
    return res.status(404).json({
 
-    error: "Quarantined email not found"
+    error: "Email not found"
 
    });
 
   }
 
-
-  /*
-  update email status
-  */
 
   email.status = "released";
 
@@ -115,9 +103,32 @@ exports.releaseEmail = async (req, res) => {
   await email.save();
 
 
-  res.json({
+  /*
+  audit log
+  */
+
+  await createLog({
+
+   tenantId,
+
+   type: "quarantine_action",
+
+   severity: "warning",
 
    message: "Email released from quarantine",
+
+   metadata: {
+
+    emailId
+
+   }
+
+  });
+
+
+  res.json({
+
+   message: "Email released",
 
    email
 
