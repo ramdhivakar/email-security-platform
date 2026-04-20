@@ -1,35 +1,66 @@
-const analyzeEmail = (email) => {
+/*
+================================================
+
+EMAIL ANALYSIS SERVICE
+
+Combines:
+
+1. keyword detection
+2. attachment detection
+3. tenant policy rules
+
+================================================
+*/
+
+const Policy = require("../models/Policy");
+
+const analyzeEmail = async (emailData, tenantId) => {
 
  let verdict = "clean";
 
- const suspiciousKeywords = [
 
+ const suspiciousKeywords = [
   "urgent",
   "password",
   "bank",
   "verify",
   "click",
-  "invoice"
-
+  "invoice",
+  "login",
+  "reset"
  ];
 
- const dangerousFileTypes = [
 
+ const dangerousFileTypes = [
   "exe",
   "bat",
   "js",
   "scr"
-
  ];
 
- // check content keywords
+
+ /*
+===========================
+LOAD TENANT POLICY
+===========================
+*/
+
+ const policy = await Policy.findOne({ tenantId });
+
+
+ /*
+===========================
+KEYWORD ANALYSIS
+===========================
+*/
+
  suspiciousKeywords.forEach(keyword => {
 
   if (
 
-   email.subject?.toLowerCase().includes(keyword) ||
+   emailData.subject?.toLowerCase().includes(keyword) ||
 
-   email.content?.toLowerCase().includes(keyword)
+   emailData.content?.toLowerCase().includes(keyword)
 
   ) {
 
@@ -39,16 +70,46 @@ const analyzeEmail = (email) => {
 
  });
 
- // check attachment types
- email.attachments?.forEach(file => {
+
+ /*
+===========================
+DOMAIN CHECK
+===========================
+*/
+
+ if (policy?.blockedDomains?.length) {
+
+  const senderDomain = emailData.from.split("@")[1];
+
+  if (policy.blockedDomains.includes(senderDomain)) {
+
+   verdict = "malicious";
+
+  }
+
+ }
+
+
+ /*
+===========================
+ATTACHMENT ANALYSIS
+===========================
+*/
+
+ emailData.attachments?.forEach(file => {
+
+  const fileType = file.fileType?.toLowerCase();
+
+
+  /*
+  block executable files
+  */
 
   if (
 
-   dangerousFileTypes.includes(
+   policy?.blockExecutable &&
 
-    file.fileType.toLowerCase()
-
-   )
+   dangerousFileTypes.includes(fileType)
 
   ) {
 
@@ -56,10 +117,46 @@ const analyzeEmail = (email) => {
 
   }
 
+
+  /*
+  file size policy
+  */
+
+  if (
+
+   policy?.maxAttachmentSize &&
+
+   file.fileSize > policy.maxAttachmentSize
+
+  ) {
+
+   verdict = "suspicious";
+
+  }
+
+
+  /*
+  allowed file types restriction
+  */
+
+  if (
+
+   policy?.allowedFileTypes?.length &&
+
+   !policy.allowedFileTypes.includes(fileType)
+
+  ) {
+
+   verdict = "suspicious";
+
+  }
+
  });
+
 
  return verdict;
 
 };
+
 
 module.exports = analyzeEmail;

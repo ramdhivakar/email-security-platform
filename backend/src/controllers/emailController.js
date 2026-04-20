@@ -2,31 +2,10 @@ const Email = require("../models/Email");
 
 const analyzeEmail = require("../services/emailAnalysisService");
 
-
-/*
-================================================
-
-EMAIL INGESTION CONTROLLER
-
-Simulates incoming email into cloud email security system
-
-Flow:
-1. Receive email data
-2. Identify tenant from JWT
-3. Analyze email content
-4. Assign verdict
-5. Apply quarantine logic
-6. Store result in DB
-7. Return response
-
-================================================
-*/
-
 exports.ingestEmail = async (req, res) => {
 
  try {
 
-  // extract email data from request body
   const {
    from,
    to,
@@ -36,25 +15,25 @@ exports.ingestEmail = async (req, res) => {
   } = req.body;
 
 
-  // tenantId extracted from JWT middleware
   const tenantId = req.user.tenantId;
 
 
   /*
-  analyze email using detection engine
+  run analysis with policy rules
   */
 
-  const verdict = analyzeEmail({
+  const verdict = await analyzeEmail({
 
+   from,
    subject,
    content,
    attachments
 
-  });
+  }, tenantId);
 
 
   /*
-  apply quarantine logic
+  quarantine logic
   */
 
   let status = "completed";
@@ -65,10 +44,6 @@ exports.ingestEmail = async (req, res) => {
 
   }
 
-
-  /*
-  store email with verdict
-  */
 
   const email = await Email.create({
 
@@ -88,10 +63,6 @@ exports.ingestEmail = async (req, res) => {
 
   });
 
-
-  /*
-  response back to client
-  */
 
   res.json({
 
@@ -117,20 +88,6 @@ exports.ingestEmail = async (req, res) => {
  }
 
 };
-
-
-
-/*
-================================================
-
-GET EMAIL LIST FOR TENANT
-
-Used for dashboard view
-
-Returns emails belonging to logged-in company only
-
-================================================
-*/
 
 exports.getEmails = async (req, res) => {
 
