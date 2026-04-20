@@ -14,6 +14,8 @@ const policyRoutes = require("./routes/policyRoutes");
 
 const logRoutes = require("./routes/logRoutes");
 
+const smtpRoutes = require("./routes/smtpRoutes");
+
 
 const app = express();
 
@@ -34,6 +36,8 @@ app.use("/api/quarantine", quarantineRoutes);
 app.use("/api/policy", policyRoutes);
 
 app.use("/api/logs", logRoutes);
+
+app.use("/api/smtp", smtpRoutes);
 
 
 app.get("/", (req, res) => {
