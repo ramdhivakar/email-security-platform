@@ -1,5 +1,7 @@
 const Policy = require("../models/Policy");
 
+const sandboxScan = require("./sandboxService");
+
 
 const suspiciousKeywords = [
 
@@ -59,11 +61,7 @@ async function analyzeEmail(email, tenantId) {
 
   if (
 
-   contentText.toLowerCase().includes(
-
-    keyword
-
-   )
+   contentText.toLowerCase().includes(keyword)
 
   ) {
 
@@ -84,18 +82,13 @@ async function analyzeEmail(email, tenantId) {
 
   email.attachments.forEach(file => {
 
-   const ext =
-
-    file.fileType?.toLowerCase();
+   const ext = file.fileType?.toLowerCase();
 
 
-   if (
-
-    dangerousFileTypes.includes(ext)
-
-   ) {
+   if (dangerousFileTypes.includes(ext)) {
 
     score += 5;
+
    }
 
 
@@ -112,6 +105,7 @@ async function analyzeEmail(email, tenantId) {
    ) {
 
     score += 10;
+
    }
 
 
@@ -124,6 +118,7 @@ async function analyzeEmail(email, tenantId) {
    ) {
 
     score += 3;
+
    }
 
 
@@ -131,16 +126,38 @@ async function analyzeEmail(email, tenantId) {
 
     policy?.maxAttachmentSize &&
 
-    file.fileSize >
-
-    policy.maxAttachmentSize
+    file.fileSize > policy.maxAttachmentSize
 
    ) {
 
     score += 3;
+
    }
 
   });
+
+
+  /*
+  ================================
+  SANDBOX SCAN
+  ================================
+  */
+
+  const sandboxVerdict = sandboxScan(email.attachments);
+
+
+  if (sandboxVerdict === "malicious") {
+
+   score += 8;
+
+  }
+
+
+  if (sandboxVerdict === "suspicious") {
+
+   score += 3;
+
+  }
 
  }
 
@@ -153,9 +170,7 @@ async function analyzeEmail(email, tenantId) {
 
  if (policy?.blockedDomains?.length) {
 
-  const domain =
-
-   email.from.split("@")[1];
+  const domain = email.from.split("@")[1];
 
 
   if (
@@ -165,7 +180,21 @@ async function analyzeEmail(email, tenantId) {
   ) {
 
    score += 6;
+
   }
+
+ }
+
+
+ /*
+ ================================
+ AUTHENTICATION CHECK
+ ================================
+ */
+
+ if (email.authentication?.dmarc === "fail") {
+
+  score += 4;
 
  }
 

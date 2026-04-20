@@ -6,6 +6,8 @@ const createLog = require("../services/logService");
 
 const validateAuth = require("../services/authValidationService");
 
+const sandboxScan = require("../services/sandboxService");
+
 
 /*
 ================================================
@@ -15,6 +17,8 @@ EMAIL INGESTION
 Supports inbound & outbound emails
 
 Includes SPF DKIM DMARC simulation
+
+Includes sandbox scan
 
 ================================================
 */
@@ -39,7 +43,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  authentication validation
+  AUTH CHECK
   */
 
   const authentication = validateAuth({
@@ -52,7 +56,18 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  run detection engine
+  SANDBOX CHECK
+  */
+
+  const sandboxResult = sandboxScan(
+
+   attachments
+
+  );
+
+
+  /*
+  ANALYZE EMAIL
   */
 
   const verdict = await analyzeEmail({
@@ -69,7 +84,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  status logic
+  STATUS LOGIC
   */
 
   let status = "completed";
@@ -87,7 +102,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  store email
+  SAVE EMAIL
   */
 
   const email = await Email.create({
@@ -114,7 +129,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  log scan result
+  LOG SCAN RESULT
   */
 
   await createLog({
@@ -146,9 +161,7 @@ exports.ingestEmail = async (req, res) => {
 
     subject,
 
-    direction,
-
-    authentication
+    direction
 
    }
 
@@ -156,7 +169,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  log authentication result
+  LOG AUTH RESULT
   */
 
   await createLog({
@@ -187,6 +200,42 @@ exports.ingestEmail = async (req, res) => {
   });
 
 
+  /*
+  LOG SANDBOX RESULT
+  */
+
+  await createLog({
+
+   tenantId,
+
+   type: "sandbox_scan",
+
+   severity:
+
+    sandboxResult === "malicious"
+
+     ? "critical"
+
+     : sandboxResult === "suspicious"
+
+     ? "warning"
+
+     : "info",
+
+
+   message:
+
+    `Sandbox verdict: ${sandboxResult}`,
+
+   metadata: {
+
+    emailId: email._id
+
+   }
+
+  });
+
+
   res.json({
 
    message: "Email analyzed",
@@ -198,6 +247,8 @@ exports.ingestEmail = async (req, res) => {
    status,
 
    authentication,
+
+   sandboxResult,
 
    emailId: email._id
 
@@ -274,8 +325,6 @@ exports.getEmails = async (req, res) => {
 
 GET SINGLE EMAIL
 
-Used for investigation
-
 ================================================
 */
 
@@ -329,8 +378,6 @@ exports.getEmailById = async (req, res) => {
 ================================================
 
 DELETE EMAIL
-
-Used for admin cleanup
 
 ================================================
 */
