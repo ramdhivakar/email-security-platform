@@ -4,6 +4,8 @@ const analyzeEmail = require("../services/emailAnalysisService");
 
 const createLog = require("../services/logService");
 
+const validateAuth = require("../services/authValidationService");
+
 
 /*
 ================================================
@@ -11,6 +13,8 @@ const createLog = require("../services/logService");
 EMAIL INGESTION
 
 Supports inbound & outbound emails
+
+Includes SPF DKIM DMARC simulation
 
 ================================================
 */
@@ -35,7 +39,20 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  run analysis engine
+  authentication validation
+  */
+
+  const authentication = validateAuth({
+
+   from,
+   subject,
+   content
+
+  });
+
+
+  /*
+  run detection engine
   */
 
   const verdict = await analyzeEmail({
@@ -45,6 +62,7 @@ exports.ingestEmail = async (req, res) => {
    subject,
    content,
    attachments,
+   authentication,
    direction
 
   }, tenantId);
@@ -59,20 +77,17 @@ exports.ingestEmail = async (req, res) => {
 
   if (verdict === "malicious") {
 
-   status = "quarantined";
+   status = direction === "outbound"
 
-  }
+    ? "blocked"
 
-
-  if (verdict === "malicious" && direction === "outbound") {
-
-   status = "blocked";
+    : "quarantined";
 
   }
 
 
   /*
-  save email
+  store email
   */
 
   const email = await Email.create({
@@ -89,6 +104,8 @@ exports.ingestEmail = async (req, res) => {
 
    attachments,
 
+   authentication,
+
    verdict,
 
    status
@@ -97,7 +114,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  log event
+  log scan result
   */
 
   await createLog({
@@ -127,9 +144,43 @@ exports.ingestEmail = async (req, res) => {
 
     emailId: email._id,
 
+    subject,
+
     direction,
 
-    subject
+    authentication
+
+   }
+
+  });
+
+
+  /*
+  log authentication result
+  */
+
+  await createLog({
+
+   tenantId,
+
+   type: "email_auth",
+
+   severity:
+
+    authentication.dmarc === "fail"
+
+     ? "warning"
+
+     : "info",
+
+
+   message:
+
+    `SPF:${authentication.spf} DKIM:${authentication.dkim} DMARC:${authentication.dmarc}`,
+
+   metadata: {
+
+    emailId: email._id
 
    }
 
@@ -145,6 +196,8 @@ exports.ingestEmail = async (req, res) => {
    verdict,
 
    status,
+
+   authentication,
 
    emailId: email._id
 
@@ -219,7 +272,9 @@ exports.getEmails = async (req, res) => {
 /*
 ================================================
 
-GET EMAIL BY ID
+GET SINGLE EMAIL
+
+Used for investigation
 
 ================================================
 */
@@ -274,6 +329,8 @@ exports.getEmailById = async (req, res) => {
 ================================================
 
 DELETE EMAIL
+
+Used for admin cleanup
 
 ================================================
 */

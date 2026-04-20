@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-
 const attachmentSchema = new mongoose.Schema({
 
  filename: String,
@@ -8,6 +7,40 @@ const attachmentSchema = new mongoose.Schema({
  fileType: String,
 
  fileSize: Number
+
+});
+
+const authSchema = new mongoose.Schema({
+
+ spf: {
+
+  type: String,
+
+  enum: ["pass", "fail"],
+
+  default: "pass"
+
+ },
+
+ dkim: {
+
+  type: String,
+
+  enum: ["pass", "fail"],
+
+  default: "pass"
+
+ },
+
+ dmarc: {
+
+  type: String,
+
+  enum: ["pass", "fail"],
+
+  default: "pass"
+
+ }
 
 });
 
@@ -24,7 +57,6 @@ const emailSchema = new mongoose.Schema({
 
  },
 
-
  direction: {
 
   type: String,
@@ -35,32 +67,17 @@ const emailSchema = new mongoose.Schema({
 
  },
 
+ from: String,
 
- from: {
-
-  type: String,
-
-  required: true
-
- },
-
-
- to: {
-
-  type: String,
-
-  required: true
-
- },
-
+ to: String,
 
  subject: String,
 
  content: String,
 
-
  attachments: [attachmentSchema],
 
+ authentication: authSchema,
 
  status: {
 
@@ -74,9 +91,9 @@ const emailSchema = new mongoose.Schema({
 
    "quarantined",
 
-   "released",
+   "blocked",
 
-   "blocked"
+   "released"
 
   ],
 
@@ -84,14 +101,11 @@ const emailSchema = new mongoose.Schema({
 
  },
 
-
  verdict: {
 
   type: String,
 
   enum: [
-
-   "unknown",
 
    "clean",
 
@@ -101,10 +115,9 @@ const emailSchema = new mongoose.Schema({
 
   ],
 
-  default: "unknown"
+  default: "clean"
 
  }
-
 
 }, {
 
