@@ -8,6 +8,8 @@ const analyzeUrls = require("../services/urlAnalysisService");
 
 const checkDomainReputation = require("../services/domainReputationService");
 
+const checkAttachmentHashes = require("../services/hashReputationService");
+
 const generateDKIMSignature = require("../services/dkimService");
 
 const createLog = require("../services/logService");
@@ -21,19 +23,6 @@ const sandboxScan = require("../services/sandboxService");
 ================================================
 
 EMAIL INGESTION ENGINE
-
-Supports:
-
-inbound email security
-outbound email security
-SPF DKIM DMARC validation
-DKIM signing (outbound)
-sandbox scan
-threat intelligence
-domain reputation
-URL phishing detection
-policy engine
-logging
 
 ================================================
 */
@@ -57,15 +46,11 @@ exports.ingestEmail = async (req, res) => {
   const tenantId = req.user.tenantId;
 
 
-  /*
-  extract domain
-  */
-
   const senderDomain = from.split("@")[1];
 
 
   /*
-  SPF DKIM DMARC simulation
+  SPF DKIM DMARC
   */
 
   const authentication = validateAuth({
@@ -108,7 +93,18 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  threat intel lookup
+  malware hash scan
+  */
+
+  const hashResults = await checkAttachmentHashes(
+
+   attachments || []
+
+  );
+
+
+  /*
+  threat intel
   */
 
   const threatResult = checkThreatIntel({
@@ -130,7 +126,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  domain reputation check
+  domain reputation
   */
 
   const domainCheck = await checkDomainReputation(
@@ -158,7 +154,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  combine results
+  combine verdict
   */
 
   let finalVerdict = policyVerdict;
@@ -180,6 +176,11 @@ exports.ingestEmail = async (req, res) => {
 
 
   if (domainCheck.reputation === "malicious")
+
+   finalVerdict = "malicious";
+
+
+  if (hashResults.some(f => f.malicious))
 
    finalVerdict = "malicious";
 
@@ -247,13 +248,15 @@ exports.ingestEmail = async (req, res) => {
 
    sandboxResult,
 
-   domainReputation: domainCheck
+   domainReputation: domainCheck,
+
+   hashResults
 
   });
 
 
   /*
-  logs
+  LOGS
   */
 
   await createLog({
@@ -371,11 +374,38 @@ exports.ingestEmail = async (req, res) => {
 
    metadata: {
 
-    emailId: email._id,
-
     domain: senderDomain,
 
-    riskScore: domainCheck.riskScore
+    riskScore: domainCheck.riskScore,
+
+    emailId: email._id
+
+   }
+
+  });
+
+
+  await createLog({
+
+   tenantId,
+
+   type: "threat_intel",
+
+   severity:
+
+    hashResults.some(f => f.malicious)
+
+     ? "critical"
+
+     : "info",
+
+   message: "Attachment hash scan completed",
+
+   metadata: {
+
+    emailId: email._id,
+
+    hashResults
 
    }
 
@@ -406,9 +436,9 @@ exports.ingestEmail = async (req, res) => {
 
    metadata: {
 
-    emailId: email._id,
+    urls: urlAnalysis.urls,
 
-    urls: urlAnalysis.urls
+    emailId: email._id
 
    }
 
@@ -429,9 +459,9 @@ exports.ingestEmail = async (req, res) => {
 
     metadata: {
 
-     emailId: email._id,
+     domain: dkim.domain,
 
-     domain: dkim.domain
+     emailId: email._id
 
     }
 
@@ -441,8 +471,6 @@ exports.ingestEmail = async (req, res) => {
 
 
   res.json({
-
-   message: "Email analyzed",
 
    verdict: finalVerdict,
 
@@ -455,6 +483,8 @@ exports.ingestEmail = async (req, res) => {
    sandboxResult,
 
    domainCheck,
+
+   hashResults,
 
    urlAnalysis,
 
@@ -476,14 +506,6 @@ exports.ingestEmail = async (req, res) => {
 };
 
 
-
-/*
-================================================
-
-GET EMAIL LIST
-
-================================================
-*/
 
 exports.getEmails = async (req, res) => {
 
@@ -526,14 +548,6 @@ exports.getEmails = async (req, res) => {
 
 
 
-/*
-================================================
-
-GET SINGLE EMAIL
-
-================================================
-*/
-
 exports.getEmailById = async (req, res) => {
 
  try {
@@ -552,15 +566,13 @@ exports.getEmailById = async (req, res) => {
   });
 
 
-  if (!email) {
+  if (!email)
 
    return res.status(404).json({
 
     error: "Email not found"
 
    });
-
-  }
 
 
   res.json(email);
@@ -580,14 +592,6 @@ exports.getEmailById = async (req, res) => {
 
 
 
-/*
-================================================
-
-DELETE EMAIL
-
-================================================
-*/
-
 exports.deleteEmail = async (req, res) => {
 
  try {
@@ -606,15 +610,13 @@ exports.deleteEmail = async (req, res) => {
   });
 
 
-  if (!email) {
+  if (!email)
 
    return res.status(404).json({
 
     error: "Email not found"
 
    });
-
-  }
 
 
   await createLog({
