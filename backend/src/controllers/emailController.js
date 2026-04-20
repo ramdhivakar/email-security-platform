@@ -14,8 +14,10 @@ Flow:
 1. Receive email data
 2. Identify tenant from JWT
 3. Analyze email content
-4. Store result in DB
-5. Return response
+4. Assign verdict
+5. Apply quarantine logic
+6. Store result in DB
+7. Return response
 
 ================================================
 */
@@ -52,6 +54,19 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
+  apply quarantine logic
+  */
+
+  let status = "completed";
+
+  if (verdict === "malicious") {
+
+   status = "quarantined";
+
+  }
+
+
+  /*
   store email with verdict
   */
 
@@ -67,7 +82,7 @@ exports.ingestEmail = async (req, res) => {
 
    attachments,
 
-   status: "completed",
+   status,
 
    verdict
 
@@ -83,6 +98,8 @@ exports.ingestEmail = async (req, res) => {
    message: "Email received and analyzed",
 
    verdict,
+
+   status,
 
    emailId: email._id
 
@@ -158,12 +175,16 @@ exports.getEmails = async (req, res) => {
 
 };
 
+
+
 /*
 ================================================
 
 GET SINGLE EMAIL DETAILS
 
 Used for investigation view
+
+Ensures tenant isolation
 
 ================================================
 */
@@ -176,6 +197,7 @@ exports.getEmailById = async (req, res) => {
 
   const emailId = req.params.id;
 
+
   const email = await Email.findOne({
 
    _id: emailId,
@@ -183,6 +205,7 @@ exports.getEmailById = async (req, res) => {
    tenantId
 
   });
+
 
   if (!email) {
 
@@ -194,7 +217,9 @@ exports.getEmailById = async (req, res) => {
 
   }
 
+
   res.json(email);
+
 
  } catch (error) {
 
