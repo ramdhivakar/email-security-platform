@@ -4,39 +4,72 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
 
+const authorizeRoles = require("../middleware/roleMiddleware");
+
 const {
+
  getQuarantinedEmails,
+
  releaseEmail
+
 } = require("../controllers/quarantineController");
 
 
 /*
 ================================================
 
-GET QUARANTINE LIST
+VIEW QUARANTINE
 
 ================================================
 */
 
 router.get(
+
  "/",
+
  authMiddleware,
+
+ authorizeRoles(
+
+  "admin",
+
+  "analyst",
+
+  "viewer"
+
+ ),
+
  getQuarantinedEmails
+
 );
 
 
 /*
 ================================================
 
-RELEASE EMAIL FROM QUARANTINE
+RELEASE EMAIL
+
+ADMIN + ANALYST
 
 ================================================
 */
 
 router.patch(
+
  "/release/:id",
+
  authMiddleware,
+
+ authorizeRoles(
+
+  "admin",
+
+  "analyst"
+
+ ),
+
  releaseEmail
+
 );
 
 

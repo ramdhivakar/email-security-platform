@@ -4,15 +4,15 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
 
+const authorizeRoles = require("../middleware/roleMiddleware");
+
 const emailController = require("../controllers/emailController");
 
 
 /*
 ================================================
 
-EMAIL INGESTION
-
-POST /api/email/ingest
+EMAIL INGEST
 
 ================================================
 */
@@ -22,6 +22,14 @@ router.post(
  "/ingest",
 
  authMiddleware,
+
+ authorizeRoles(
+
+  "admin",
+
+  "analyst"
+
+ ),
 
  emailController.ingestEmail
 
@@ -33,8 +41,6 @@ router.post(
 
 EMAIL LIST
 
-GET /api/email/list
-
 ================================================
 */
 
@@ -44,6 +50,16 @@ router.get(
 
  authMiddleware,
 
+ authorizeRoles(
+
+  "admin",
+
+  "analyst",
+
+  "viewer"
+
+ ),
+
  emailController.getEmails
 
 );
@@ -52,9 +68,7 @@ router.get(
 /*
 ================================================
 
-GET SINGLE EMAIL
-
-GET /api/email/:id
+EMAIL DETAILS
 
 ================================================
 */
@@ -64,6 +78,16 @@ router.get(
  "/:id",
 
  authMiddleware,
+
+ authorizeRoles(
+
+  "admin",
+
+  "analyst",
+
+  "viewer"
+
+ ),
 
  emailController.getEmailById
 
@@ -75,7 +99,7 @@ router.get(
 
 DELETE EMAIL
 
-DELETE /api/email/:id
+ADMIN ONLY
 
 ================================================
 */
@@ -85,6 +109,12 @@ router.delete(
  "/:id",
 
  authMiddleware,
+
+ authorizeRoles(
+
+  "admin"
+
+ ),
 
  emailController.deleteEmail
 

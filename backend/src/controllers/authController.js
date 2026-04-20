@@ -1,54 +1,110 @@
 const bcrypt = require("bcryptjs");
+
 const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
+
 const Tenant = require("../models/Tenant");
 
 
 /*
+================================================
+
 REGISTER CONTROLLER
-creates company + admin user
+
+Creates company + admin user
+
+================================================
 */
 
 exports.register = async (req, res) => {
 
  try {
 
-  // get data from frontend request
-  const { companyName, domain, email, password } = req.body;
-
-
-  // create tenant (company)
-  const tenant = await Tenant.create({
+  const {
 
    companyName,
+
+   domain,
+
+   email,
+
+   password,
+
+   role = "admin"
+
+  } = req.body;
+
+
+  /*
+  find tenant by domain
+  */
+
+  let tenant = await Tenant.findOne({
+
    domain
 
   });
 
 
-  // hash password for security
-  const hashedPassword = await bcrypt.hash(password, 10);
+  /*
+  create tenant only first time
+  */
+
+  if (!tenant) {
+
+   tenant = await Tenant.create({
+
+    companyName,
+
+    domain
+
+   });
+
+  }
 
 
-  // create user linked to tenant
+  /*
+  hash password
+  */
+
+  const hashedPassword = await bcrypt.hash(
+
+   password,
+
+   10
+
+  );
+
+
+  /*
+  create user
+  */
+
   const user = await User.create({
 
    email,
+
    password: hashedPassword,
-   tenantId: tenant._id
+
+   tenantId: tenant._id,
+
+   role
 
   });
 
 
   res.json({
 
-   message: "Registration successful",
+   message: "User created",
+
    tenantId: tenant._id,
-   userId: user._id
+
+   userId: user._id,
+
+   role: user.role
 
   });
-
 
  } catch (error) {
 
@@ -65,20 +121,33 @@ exports.register = async (req, res) => {
 
 
 /*
+================================================
+
 LOGIN CONTROLLER
-verifies user credentials
-creates JWT token
+
+Creates JWT token with role
+
+================================================
 */
 
 exports.login = async (req, res) => {
 
  try {
 
-  const { email, password } = req.body;
+  const {
+
+   email,
+
+   password
+
+  } = req.body;
 
 
-  // find user
-  const user = await User.findOne({ email });
+  const user = await User.findOne({
+
+   email
+
+  });
 
 
   if (!user) {
@@ -92,8 +161,13 @@ exports.login = async (req, res) => {
   }
 
 
-  // compare password
-  const isMatch = await bcrypt.compare(password, user.password);
+  const isMatch = await bcrypt.compare(
+
+   password,
+
+   user.password
+
+  );
 
 
   if (!isMatch) {
@@ -107,19 +181,29 @@ exports.login = async (req, res) => {
   }
 
 
-  // create JWT token
+  /*
+  JWT includes role
+  */
+
   const token = jwt.sign(
 
    {
 
     userId: user._id,
-    tenantId: user.tenantId
+
+    tenantId: user.tenantId,
+
+    role: user.role
 
    },
 
    process.env.JWT_SECRET,
 
-   { expiresIn: "1d" }
+   {
+
+    expiresIn: "1d"
+
+   }
 
   );
 
@@ -127,10 +211,12 @@ exports.login = async (req, res) => {
   res.json({
 
    message: "Login successful",
-   token
+
+   token,
+
+   role: user.role
 
   });
-
 
  } catch (error) {
 

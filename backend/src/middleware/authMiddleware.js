@@ -1,34 +1,54 @@
 const jwt = require("jsonwebtoken");
 
-const authMiddleware = (req, res, next) => {
+
+const authMiddleware = (
+
+ req,
+
+ res,
+
+ next
+
+) => {
 
  try {
 
-  // get token from request header
-  const token = req.headers.authorization;
+  const header =
+
+   req.headers.authorization;
 
 
-  if (!token) {
+  if (!header) {
 
    return res.status(401).json({
 
-    error: "Access denied. No token provided"
+    error: "No token provided"
 
    });
 
   }
 
 
-  // verify token
+  /*
+  supports Bearer token
+  */
+
+  const token = header.startsWith("Bearer ")
+
+   ? header.split(" ")[1]
+
+   : header;
+
+
   const decoded = jwt.verify(
 
    token,
+
    process.env.JWT_SECRET
 
   );
 
 
-  // attach user info to request
   req.user = decoded;
 
 
