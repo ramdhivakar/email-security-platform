@@ -12,30 +12,16 @@ const quarantineRoutes = require("./routes/quarantineRoutes");
 
 const policyRoutes = require("./routes/policyRoutes");
 
+const logRoutes = require("./routes/logRoutes");
+
 
 const app = express();
 
-
-/*
-=====================================
-
-MIDDLEWARE
-
-=====================================
-*/
 
 app.use(cors());
 
 app.use(express.json());
 
-
-/*
-=====================================
-
-ROUTES
-
-=====================================
-*/
 
 app.use("/api/auth", authRoutes);
 
@@ -47,14 +33,8 @@ app.use("/api/quarantine", quarantineRoutes);
 
 app.use("/api/policy", policyRoutes);
 
+app.use("/api/logs", logRoutes);
 
-/*
-=====================================
-
-TEST ROUTE
-
-=====================================
-*/
 
 app.get("/", (req, res) => {
 
