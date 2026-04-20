@@ -2,6 +2,8 @@ const Policy = require("../models/Policy");
 
 const sandboxScan = require("./sandboxService");
 
+const checkThreatIntel = require("./threatIntelService");
+
 
 const suspiciousKeywords = [
 
@@ -44,6 +46,24 @@ async function analyzeEmail(email, tenantId) {
 
  /*
  ================================
+ THREAT INTELLIGENCE CHECK
+ ================================
+ */
+
+ const threatResult =
+
+  checkThreatIntel(email);
+
+
+ if (threatResult.isMalicious) {
+
+  score += 10;
+
+ }
+
+
+ /*
+ ================================
  CONTENT ANALYSIS
  ================================
  */
@@ -82,7 +102,9 @@ async function analyzeEmail(email, tenantId) {
 
   email.attachments.forEach(file => {
 
-   const ext = file.fileType?.toLowerCase();
+   const ext =
+
+    file.fileType?.toLowerCase();
 
 
    if (dangerousFileTypes.includes(ext)) {
@@ -91,10 +113,6 @@ async function analyzeEmail(email, tenantId) {
 
    }
 
-
-   /*
-   POLICY RULES
-   */
 
    if (
 
@@ -126,7 +144,9 @@ async function analyzeEmail(email, tenantId) {
 
     policy?.maxAttachmentSize &&
 
-    file.fileSize > policy.maxAttachmentSize
+    file.fileSize >
+
+    policy.maxAttachmentSize
 
    ) {
 
@@ -138,12 +158,12 @@ async function analyzeEmail(email, tenantId) {
 
 
   /*
-  ================================
   SANDBOX SCAN
-  ================================
   */
 
-  const sandboxVerdict = sandboxScan(email.attachments);
+  const sandboxVerdict =
+
+   sandboxScan(email.attachments);
 
 
   if (sandboxVerdict === "malicious") {
@@ -164,13 +184,15 @@ async function analyzeEmail(email, tenantId) {
 
  /*
  ================================
- DOMAIN CHECK
+ DOMAIN BLOCK POLICY
  ================================
  */
 
  if (policy?.blockedDomains?.length) {
 
-  const domain = email.from.split("@")[1];
+  const domain =
+
+   email.from.split("@")[1];
 
 
   if (
@@ -192,7 +214,11 @@ async function analyzeEmail(email, tenantId) {
  ================================
  */
 
- if (email.authentication?.dmarc === "fail") {
+ if (
+
+  email.authentication?.dmarc === "fail"
+
+ ) {
 
   score += 4;
 

@@ -3,24 +3,26 @@ const Log = require("../models/Log");
 /*
 ================================================
 
-CENTRAL LOGGING FUNCTION
+CENTRAL LOG SERVICE
+
+Standard logging format for entire platform
 
 ================================================
 */
 
-const createLog = async (
+async function createLog({
 
  tenantId,
 
  type,
 
- message,
+ severity,
 
- severity = "info",
+ message,
 
  metadata = {}
 
-) => {
+}) {
 
  try {
 
@@ -30,9 +32,9 @@ const createLog = async (
 
    type,
 
-   message,
-
    severity,
+
+   message,
 
    metadata
 
@@ -40,17 +42,10 @@ const createLog = async (
 
  } catch (error) {
 
-  console.error(
-
-   "Log write failed:",
-
-   error.message
-
-  );
+  console.error("Log write failed:", error.message);
 
  }
 
-};
-
+}
 
 module.exports = createLog;

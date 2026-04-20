@@ -2,6 +2,8 @@ const Email = require("../models/Email");
 
 const analyzeEmail = require("../services/emailAnalysisService");
 
+const checkThreatIntel = require("../services/threatIntelService");
+
 const createLog = require("../services/logService");
 
 const validateAuth = require("../services/authValidationService");
@@ -16,9 +18,11 @@ EMAIL INGESTION
 
 Supports inbound & outbound emails
 
-Includes SPF DKIM DMARC simulation
-
-Includes sandbox scan
+Includes:
+SPF DKIM DMARC
+sandbox scan
+threat intelligence
+policy engine
 
 ================================================
 */
@@ -43,7 +47,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  AUTH CHECK
+  AUTHENTICATION CHECK
   */
 
   const authentication = validateAuth({
@@ -64,6 +68,17 @@ exports.ingestEmail = async (req, res) => {
    attachments
 
   );
+
+
+  /*
+  THREAT INTELLIGENCE CHECK
+  */
+
+  const threatResult = checkThreatIntel({
+
+   from
+
+  });
 
 
   /*
@@ -129,7 +144,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  LOG SCAN RESULT
+  LOG EMAIL SCAN
   */
 
   await createLog({
@@ -236,6 +251,35 @@ exports.ingestEmail = async (req, res) => {
   });
 
 
+  /*
+  LOG THREAT INTEL RESULT
+  */
+
+  if (threatResult.isMalicious) {
+
+   await createLog({
+
+    tenantId,
+
+    type: "threat_intel",
+
+    severity: "critical",
+
+    message: "Sender domain flagged by threat intelligence",
+
+    metadata: {
+
+     from,
+
+     reason: threatResult.reason
+
+    }
+
+   });
+
+  }
+
+
   res.json({
 
    message: "Email analyzed",
@@ -249,6 +293,14 @@ exports.ingestEmail = async (req, res) => {
    authentication,
 
    sandboxResult,
+
+   threatIntel:
+
+    threatResult.isMalicious
+
+     ? threatResult.reason
+
+     : "clean",
 
    emailId: email._id
 

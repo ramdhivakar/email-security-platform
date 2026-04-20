@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 
+
 const logSchema = new mongoose.Schema({
 
  tenantId: {
@@ -12,6 +13,7 @@ const logSchema = new mongoose.Schema({
 
  },
 
+
  type: {
 
   type: String,
@@ -20,9 +22,17 @@ const logSchema = new mongoose.Schema({
 
    "email_scan",
 
-   "policy_update",
+   "email_auth",
 
-   "auth",
+   "sandbox_scan",
+
+   "threat_intel",
+
+   "smtp_connection",
+
+   "smtp_processing",
+
+   "policy_update",
 
    "quarantine_action",
 
@@ -33,6 +43,7 @@ const logSchema = new mongoose.Schema({
   required: true
 
  },
+
 
  severity: {
 
@@ -52,6 +63,7 @@ const logSchema = new mongoose.Schema({
 
  },
 
+
  message: {
 
   type: String,
@@ -60,9 +72,12 @@ const logSchema = new mongoose.Schema({
 
  },
 
+
  metadata: {
 
-  type: Object
+  type: Object,
+
+  default: {}
 
  }
 
@@ -75,10 +90,4 @@ const logSchema = new mongoose.Schema({
 });
 
 
-module.exports = mongoose.model(
-
- "Log",
-
- logSchema
-
-);
+module.exports = mongoose.model("Log", logSchema);
