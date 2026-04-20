@@ -16,6 +16,7 @@ const logRoutes = require("./routes/logRoutes");
 
 const smtpRoutes = require("./routes/smtpRoutes");
 
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 
@@ -38,6 +39,8 @@ app.use("/api/policy", policyRoutes);
 app.use("/api/logs", logRoutes);
 
 app.use("/api/smtp", smtpRoutes);
+
+app.use("/api/users", userRoutes);
 
 
 app.get("/", (req, res) => {
