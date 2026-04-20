@@ -9,6 +9,7 @@ const emailRoutes = require("./routes/emailRoutes");
 
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
+const quarantineRoutes = require("./routes/quarantineRoutes");
 
 const app = express();
 
@@ -39,6 +40,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/email", emailRoutes);
 
 app.use("/api/dashboard", dashboardRoutes);
+
+app.use("/api/quarantine", quarantineRoutes);
 
 
 /*
