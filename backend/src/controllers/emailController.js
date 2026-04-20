@@ -157,3 +157,53 @@ exports.getEmails = async (req, res) => {
  }
 
 };
+
+/*
+================================================
+
+GET SINGLE EMAIL DETAILS
+
+Used for investigation view
+
+================================================
+*/
+
+exports.getEmailById = async (req, res) => {
+
+ try {
+
+  const tenantId = req.user.tenantId;
+
+  const emailId = req.params.id;
+
+  const email = await Email.findOne({
+
+   _id: emailId,
+
+   tenantId
+
+  });
+
+  if (!email) {
+
+   return res.status(404).json({
+
+    error: "Email not found"
+
+   });
+
+  }
+
+  res.json(email);
+
+ } catch (error) {
+
+  res.status(500).json({
+
+   error: error.message
+
+  });
+
+ }
+
+};

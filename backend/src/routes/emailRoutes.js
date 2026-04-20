@@ -36,5 +36,11 @@ router.get(
 
 );
 
+router.get(
+ "/email/:id",
+ authMiddleware,
+ emailController.getEmailById
+);
+
 
 module.exports = router;
