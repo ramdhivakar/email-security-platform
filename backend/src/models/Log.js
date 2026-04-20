@@ -36,6 +36,8 @@ const logSchema = new mongoose.Schema({
 
    "quarantine_action",
 
+   "user_mgmt",
+
    "system"
 
   ],

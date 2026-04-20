@@ -4,6 +4,8 @@ const analyzeEmail = require("../services/emailAnalysisService");
 
 const checkThreatIntel = require("../services/threatIntelService");
 
+const analyzeUrls = require("../services/urlAnalysisService");
+
 const createLog = require("../services/logService");
 
 const validateAuth = require("../services/authValidationService");
@@ -14,15 +16,18 @@ const sandboxScan = require("../services/sandboxService");
 /*
 ================================================
 
-EMAIL INGESTION
+EMAIL INGESTION ENGINE
 
-Supports inbound & outbound emails
+Supports:
 
-Includes:
+inbound emails
+outbound emails
 SPF DKIM DMARC
 sandbox scan
 threat intelligence
+URL phishing detection
 policy engine
+logging
 
 ================================================
 */
@@ -65,13 +70,13 @@ exports.ingestEmail = async (req, res) => {
 
   const sandboxResult = sandboxScan(
 
-   attachments
+   attachments || []
 
   );
 
 
   /*
-  THREAT INTELLIGENCE CHECK
+  THREAT INTEL CHECK
   */
 
   const threatResult = checkThreatIntel({
@@ -82,10 +87,21 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  ANALYZE EMAIL
+  URL SCAN
   */
 
-  const verdict = await analyzeEmail({
+  const urlAnalysis = analyzeUrls(
+
+   content || ""
+
+  );
+
+
+  /*
+  CONTENT + POLICY ANALYSIS
+  */
+
+  const policyVerdict = await analyzeEmail({
 
    from,
    to,
@@ -99,13 +115,65 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
+  FINAL VERDICT MERGE
+  */
+
+  let finalVerdict = policyVerdict;
+
+
+  if (
+
+   urlAnalysis.verdict === "malicious"
+
+  ) {
+
+   finalVerdict = "malicious";
+
+  }
+
+
+  if (
+
+   sandboxResult === "malicious"
+
+  ) {
+
+   finalVerdict = "malicious";
+
+  }
+
+
+  if (
+
+   threatResult.isMalicious
+
+  ) {
+
+   finalVerdict = "malicious";
+
+  }
+
+
+  if (
+
+   urlAnalysis.verdict === "suspicious" &&
+   finalVerdict === "clean"
+
+  ) {
+
+   finalVerdict = "suspicious";
+
+  }
+
+
+  /*
   STATUS LOGIC
   */
 
   let status = "completed";
 
 
-  if (verdict === "malicious") {
+  if (finalVerdict === "malicious") {
 
    status = direction === "outbound"
 
@@ -136,15 +204,19 @@ exports.ingestEmail = async (req, res) => {
 
    authentication,
 
-   verdict,
+   verdict: finalVerdict,
 
-   status
+   status,
+
+   urlAnalysis,
+
+   sandboxResult
 
   });
 
 
   /*
-  LOG EMAIL SCAN
+  EMAIL SCAN LOG
   */
 
   await createLog({
@@ -155,11 +227,11 @@ exports.ingestEmail = async (req, res) => {
 
    severity:
 
-    verdict === "malicious"
+    finalVerdict === "malicious"
 
      ? "critical"
 
-     : verdict === "suspicious"
+     : finalVerdict === "suspicious"
 
      ? "warning"
 
@@ -168,7 +240,8 @@ exports.ingestEmail = async (req, res) => {
 
    message:
 
-    `Email ${direction} analyzed: ${verdict}`,
+    `Email ${direction} analyzed: ${finalVerdict}`,
+
 
    metadata: {
 
@@ -176,7 +249,9 @@ exports.ingestEmail = async (req, res) => {
 
     subject,
 
-    direction
+    direction,
+
+    status
 
    }
 
@@ -184,7 +259,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  LOG AUTH RESULT
+  AUTH LOG
   */
 
   await createLog({
@@ -206,6 +281,7 @@ exports.ingestEmail = async (req, res) => {
 
     `SPF:${authentication.spf} DKIM:${authentication.dkim} DMARC:${authentication.dmarc}`,
 
+
    metadata: {
 
     emailId: email._id
@@ -216,7 +292,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  LOG SANDBOX RESULT
+  SANDBOX LOG
   */
 
   await createLog({
@@ -242,6 +318,7 @@ exports.ingestEmail = async (req, res) => {
 
     `Sandbox verdict: ${sandboxResult}`,
 
+
    metadata: {
 
     emailId: email._id
@@ -252,7 +329,7 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  LOG THREAT INTEL RESULT
+  THREAT INTEL LOG
   */
 
   if (threatResult.isMalicious) {
@@ -265,13 +342,15 @@ exports.ingestEmail = async (req, res) => {
 
     severity: "critical",
 
-    message: "Sender domain flagged by threat intelligence",
+    message: "Sender flagged by threat intelligence",
 
     metadata: {
 
      from,
 
-     reason: threatResult.reason
+     reason: threatResult.reason,
+
+     emailId: email._id
 
     }
 
@@ -280,13 +359,52 @@ exports.ingestEmail = async (req, res) => {
   }
 
 
+  /*
+  URL SCAN LOG
+  */
+
+  await createLog({
+
+   tenantId,
+
+   type: "smtp_processing",
+
+   severity:
+
+    urlAnalysis.verdict === "malicious"
+
+     ? "critical"
+
+     : urlAnalysis.verdict === "suspicious"
+
+     ? "warning"
+
+     : "info",
+
+
+   message:
+
+    `URL scan verdict: ${urlAnalysis.verdict}`,
+
+
+   metadata: {
+
+    emailId: email._id,
+
+    urls: urlAnalysis.urls
+
+   }
+
+  });
+
+
   res.json({
 
    message: "Email analyzed",
 
    direction,
 
-   verdict,
+   verdict: finalVerdict,
 
    status,
 
@@ -301,6 +419,8 @@ exports.ingestEmail = async (req, res) => {
      ? threatResult.reason
 
      : "clean",
+
+   urlAnalysis,
 
    emailId: email._id
 
@@ -340,9 +460,7 @@ exports.getEmails = async (req, res) => {
 
    tenantId
 
-  })
-
-  .sort({
+  }).sort({
 
    createdAt: -1
 
