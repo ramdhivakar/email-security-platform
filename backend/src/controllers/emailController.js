@@ -8,18 +8,9 @@ const createLog = require("../services/logService");
 /*
 ================================================
 
-EMAIL INGESTION CONTROLLER
+EMAIL INGESTION
 
-Simulates incoming email into cloud email security system
-
-Flow:
-1. Receive email data
-2. Identify tenant from JWT
-3. Analyze email content + policy rules
-4. Apply quarantine logic
-5. Store result in DB
-6. Write log
-7. Return response
+Supports inbound & outbound emails
 
 ================================================
 */
@@ -34,7 +25,8 @@ exports.ingestEmail = async (req, res) => {
    to,
    subject,
    content,
-   attachments
+   attachments,
+   direction = "inbound"
 
   } = req.body;
 
@@ -43,30 +35,27 @@ exports.ingestEmail = async (req, res) => {
 
 
   /*
-  run detection engine
+  run analysis engine
   */
 
-  const verdict = await analyzeEmail(
+  const verdict = await analyzeEmail({
 
-   {
+   from,
+   to,
+   subject,
+   content,
+   attachments,
+   direction
 
-    from,
-    subject,
-    content,
-    attachments
-
-   },
-
-   tenantId
-
-  );
+  }, tenantId);
 
 
   /*
-  quarantine logic
+  status logic
   */
 
   let status = "completed";
+
 
   if (verdict === "malicious") {
 
@@ -75,13 +64,22 @@ exports.ingestEmail = async (req, res) => {
   }
 
 
+  if (verdict === "malicious" && direction === "outbound") {
+
+   status = "blocked";
+
+  }
+
+
   /*
-  store email
+  save email
   */
 
   const email = await Email.create({
 
    tenantId,
+
+   direction,
 
    from,
    to,
@@ -91,45 +89,58 @@ exports.ingestEmail = async (req, res) => {
 
    attachments,
 
-   status,
+   verdict,
 
-   verdict
+   status
 
   });
 
 
   /*
-  create log entry
+  log event
   */
 
-  await createLog(
+  await createLog({
 
    tenantId,
 
-   "email_scan",
+   type: "email_scan",
 
-   `Email analyzed with verdict ${verdict}`,
+   severity:
 
-   verdict === "malicious" ? "critical" : "info",
+    verdict === "malicious"
 
-   {
+     ? "critical"
+
+     : verdict === "suspicious"
+
+     ? "warning"
+
+     : "info",
+
+
+   message:
+
+    `Email ${direction} analyzed: ${verdict}`,
+
+   metadata: {
 
     emailId: email._id,
 
-    from,
+    direction,
 
-    subject,
-
-    status
+    subject
 
    }
 
-  );
+  });
 
 
   res.json({
 
-   message: "Email received and analyzed",
+   message: "Email analyzed",
+
+   direction,
 
    verdict,
 
@@ -141,9 +152,6 @@ exports.ingestEmail = async (req, res) => {
 
 
  } catch (error) {
-
-  console.error(error);
-
 
   res.status(500).json({
 
@@ -161,10 +169,6 @@ exports.ingestEmail = async (req, res) => {
 ================================================
 
 GET EMAIL LIST
-
-Used for dashboard list view
-
-Tenant isolation applied
 
 ================================================
 */
@@ -215,11 +219,7 @@ exports.getEmails = async (req, res) => {
 /*
 ================================================
 
-GET SINGLE EMAIL DETAILS
-
-Used for investigation screen
-
-Ensures tenant isolation
+GET EMAIL BY ID
 
 ================================================
 */
@@ -275,10 +275,6 @@ exports.getEmailById = async (req, res) => {
 
 DELETE EMAIL
 
-Used for admin cleanup or compliance
-
-Logs deletion activity
-
 ================================================
 */
 
@@ -304,43 +300,35 @@ exports.deleteEmail = async (req, res) => {
 
    return res.status(404).json({
 
-    error: "Email not found or not authorized"
+    error: "Email not found"
 
    });
 
   }
 
 
-  /*
-  log deletion event
-  */
-
-  await createLog(
+  await createLog({
 
    tenantId,
 
-   "system",
+   type: "system",
 
-   "Email deleted by admin",
+   severity: "warning",
 
-   "warning",
+   message: "Email deleted",
 
-   {
+   metadata: {
 
-    emailId,
-
-    subject: email.subject,
-
-    from: email.from
+    emailId
 
    }
 
-  );
+  });
 
 
   res.json({
 
-   message: "Email deleted successfully",
+   message: "Email deleted",
 
    emailId
 

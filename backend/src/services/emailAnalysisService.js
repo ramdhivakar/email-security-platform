@@ -1,70 +1,73 @@
-/*
-================================================
-
-EMAIL ANALYSIS SERVICE
-
-Combines:
-
-1. keyword detection
-2. attachment detection
-3. tenant policy rules
-
-================================================
-*/
-
 const Policy = require("../models/Policy");
 
-const analyzeEmail = async (emailData, tenantId) => {
 
- let verdict = "clean";
+const suspiciousKeywords = [
 
+ "urgent",
+ "password",
+ "bank",
+ "login",
+ "verify",
+ "click",
+ "invoice",
+ "payment"
 
- const suspiciousKeywords = [
-  "urgent",
-  "password",
-  "bank",
-  "verify",
-  "click",
-  "invoice",
-  "login",
-  "reset"
- ];
+];
 
 
- const dangerousFileTypes = [
-  "exe",
-  "bat",
-  "js",
-  "scr"
- ];
+const dangerousFileTypes = [
+
+ "exe",
+ "bat",
+ "js",
+ "scr",
+ "cmd",
+ "ps1",
+ "zip"
+
+];
+
+
+async function analyzeEmail(email, tenantId) {
+
+ let score = 0;
+
+
+ const policy = await Policy.findOne({
+
+  tenantId
+
+ });
 
 
  /*
-===========================
-LOAD TENANT POLICY
-===========================
-*/
+ ================================
+ CONTENT ANALYSIS
+ ================================
+ */
 
- const policy = await Policy.findOne({ tenantId });
+ const contentText =
 
+  (email.subject || "") +
 
- /*
-===========================
-KEYWORD ANALYSIS
-===========================
-*/
+  " " +
+
+  (email.content || "");
+
 
  suspiciousKeywords.forEach(keyword => {
 
   if (
 
-   emailData.subject?.toLowerCase().includes(keyword) ||
+   contentText.toLowerCase().includes(
 
-   emailData.content?.toLowerCase().includes(keyword)
+    keyword
+
+   )
 
   ) {
 
-   verdict = "suspicious";
+   score += 1;
 
   }
 
@@ -72,91 +75,124 @@ KEYWORD ANALYSIS
 
 
  /*
-===========================
-DOMAIN CHECK
-===========================
-*/
+ ================================
+ ATTACHMENT ANALYSIS
+ ================================
+ */
+
+ if (email.attachments?.length) {
+
+  email.attachments.forEach(file => {
+
+   const ext =
+
+    file.fileType?.toLowerCase();
+
+
+   if (
+
+    dangerousFileTypes.includes(ext)
+
+   ) {
+
+    score += 5;
+   }
+
+
+   /*
+   POLICY RULES
+   */
+
+   if (
+
+    policy?.blockExecutable &&
+
+    ext === "exe"
+
+   ) {
+
+    score += 10;
+   }
+
+
+   if (
+
+    policy?.allowedFileTypes?.length &&
+
+    !policy.allowedFileTypes.includes(ext)
+
+   ) {
+
+    score += 3;
+   }
+
+
+   if (
+
+    policy?.maxAttachmentSize &&
+
+    file.fileSize >
+
+    policy.maxAttachmentSize
+
+   ) {
+
+    score += 3;
+   }
+
+  });
+
+ }
+
+
+ /*
+ ================================
+ DOMAIN CHECK
+ ================================
+ */
 
  if (policy?.blockedDomains?.length) {
 
-  const senderDomain = emailData.from.split("@")[1];
+  const domain =
 
-  if (policy.blockedDomains.includes(senderDomain)) {
+   email.from.split("@")[1];
 
-   verdict = "malicious";
 
+  if (
+
+   policy.blockedDomains.includes(domain)
+
+  ) {
+
+   score += 6;
   }
 
  }
 
 
  /*
-===========================
-ATTACHMENT ANALYSIS
-===========================
-*/
+ ================================
+ FINAL VERDICT
+ ================================
+ */
 
- emailData.attachments?.forEach(file => {
+ if (score >= 10) {
 
-  const fileType = file.fileType?.toLowerCase();
+  return "malicious";
 
-
-  /*
-  block executable files
-  */
-
-  if (
-
-   policy?.blockExecutable &&
-
-   dangerousFileTypes.includes(fileType)
-
-  ) {
-
-   verdict = "malicious";
-
-  }
+ }
 
 
-  /*
-  file size policy
-  */
+ if (score >= 4) {
 
-  if (
+  return "suspicious";
 
-   policy?.maxAttachmentSize &&
-
-   file.fileSize > policy.maxAttachmentSize
-
-  ) {
-
-   verdict = "suspicious";
-
-  }
+ }
 
 
-  /*
-  allowed file types restriction
-  */
+ return "clean";
 
-  if (
-
-   policy?.allowedFileTypes?.length &&
-
-   !policy.allowedFileTypes.includes(fileType)
-
-  ) {
-
-   verdict = "suspicious";
-
-  }
-
- });
-
-
- return verdict;
-
-};
+}
 
 
 module.exports = analyzeEmail;

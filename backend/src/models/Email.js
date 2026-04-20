@@ -1,14 +1,37 @@
 const mongoose = require("mongoose");
 
+
+const attachmentSchema = new mongoose.Schema({
+
+ filename: String,
+
+ fileType: String,
+
+ fileSize: Number
+
+});
+
+
 const emailSchema = new mongoose.Schema({
 
  tenantId: {
 
-  type: mongoose.Schema.Types.ObjectId,
+  type: String,
 
-  ref: "Tenant",
+  required: true,
 
-  required: true
+  index: true
+
+ },
+
+
+ direction: {
+
+  type: String,
+
+  enum: ["inbound", "outbound"],
+
+  default: "inbound"
 
  },
 
@@ -31,38 +54,31 @@ const emailSchema = new mongoose.Schema({
  },
 
 
- subject: {
+ subject: String,
 
-  type: String
-
- },
+ content: String,
 
 
- content: {
-
-  type: String
-
- },
-
-
- attachments: [
-
-  {
-
-   filename: String,
-
-   fileType: String,
-
-   fileSize: Number
-
-  }
-
- ],
+ attachments: [attachmentSchema],
 
 
  status: {
 
   type: String,
+
+  enum: [
+
+   "pending",
+
+   "completed",
+
+   "quarantined",
+
+   "released",
+
+   "blocked"
+
+  ],
 
   default: "pending"
 
@@ -73,19 +89,28 @@ const emailSchema = new mongoose.Schema({
 
   type: String,
 
+  enum: [
+
+   "unknown",
+
+   "clean",
+
+   "suspicious",
+
+   "malicious"
+
+  ],
+
   default: "unknown"
-
- },
-
-
- createdAt: {
-
-  type: Date,
-
-  default: Date.now
 
  }
 
+
+}, {
+
+ timestamps: true
+
 });
+
 
 module.exports = mongoose.model("Email", emailSchema);
